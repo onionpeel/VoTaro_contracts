@@ -1,20 +1,22 @@
 pragma solidity ^0.5.16;
 pragma experimental ABIEncoderV2;
 
+import "hardhat/console.sol";
+
 contract GovernorAlpha {
     /// @notice The name of this contract
     string public constant name = "VoTaro Governor Alpha";
 
-    // /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
+    /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
     // function quorumVotes() public pure returns (uint) { return 400000e18; } // 400,000 = 4% of Comp
     //
-    // /// @notice The number of votes required in order for a voter to become a proposer
+    /// @notice The number of votes required in order for a voter to become a proposer
     function proposalThreshold() public pure returns (uint) { return 100000e18; } // 100,000 = 1% of Comp
     //
-    // /// @notice The maximum number of actions that can be included in a proposal
+    /// @notice The maximum number of actions that can be included in a proposal
     // function proposalMaxOperations() public pure returns (uint) { return 10; } // 10 actions
     //
-    // /// @notice The delay before voting on a proposal may take place, once proposed
+    /// @notice The delay before voting on a proposal may take place, once proposed
     function votingDelay() public pure returns (uint) { return 1; } // 1 block
     //
     // /// @notice The duration of voting on a proposal, in blocks
@@ -39,20 +41,11 @@ contract GovernorAlpha {
         /// @notice Creator of the proposal
         address proposer;
 
-        /// @notice The timestamp that the proposal will be available for execution, set once the vote succeeds
+        // / @notice The timestamp that the proposal will be available for execution, set once the vote succeeds
         uint eta;
 
-        /// @notice the ordered list of target addresses for calls to be made
-        // address[] targets;
-        //
-        // /// @notice The ordered list of values (i.e. msg.value) to be passed to the calls to be made
-        // uint[] values;
-        //
-        // /// @notice The ordered list of function signatures to be called
-        // string[] signatures;
-        //
-        // /// @notice The ordered list of calldata to be passed to each call
-        // bytes[] calldatas;
+        /// @notice A struct that holds the proposal fields from the user input
+        UserInputFields userInputFields;
 
         /// @notice The block at which voting begins: holders must delegate their votes prior to this block
         uint startBlock;
@@ -133,30 +126,40 @@ contract GovernorAlpha {
         guardian = guardian_;
     }
 
-    function propose(address[] memory targets, uint[] memory values, string[] memory signatures, bytes[] memory calldatas, string memory description) public returns (uint) {
-        require(comp.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold(), "GovernorAlpha::propose: proposer votes below proposal threshold");
+    struct UserInputFields {
+      string title;
+      string typeOfAction;
+      string neighborhood;
+      string personInCharge;
+      string description;
+      uint expiration;
+      uint budget;
+      uint requiredTaroToVote;
+    }
 
 
+    function propose(UserInputFields memory _userInputFields) public returns (uint) {
+        // require(comp.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold(), "GovernorAlpha::propose: proposer votes below proposal threshold");
 
         uint startBlock = add256(block.number, votingDelay());
         uint endBlock = add256(startBlock, votingPeriod());
 
         proposalCount++;
-        // Proposal memory newProposal = Proposal({
-        //     id: proposalCount,
-        //     proposer: msg.sender,
-        //     eta: 0,
-        //     targets: targets,
-        //     values: values,
-        //     signatures: signatures,
-        //     calldatas: calldatas,
-        //     startBlock: startBlock,
-        //     endBlock: endBlock,
-        //     forVotes: 0,
-        //     againstVotes: 0,
-        //     canceled: false,
-        //     executed: false
-        // });
+        Proposal memory newProposal = Proposal({
+            id: proposalCount,
+            proposer: msg.sender,
+            userInputFields: _userInputFields,
+            eta: 0,
+            startBlock: startBlock,
+            endBlock: endBlock,
+            forVotes: 0,
+            againstVotes: 0,
+            canceled: false,
+            executed: false
+        });
+
+        console.log('title: ', newProposal.userInputFields.title);
+        console.log('budget: ', newProposal.userInputFields.budget);
 
         // proposals[newProposal.id] = newProposal;
         // latestProposalIds[newProposal.proposer] = newProposal.id;

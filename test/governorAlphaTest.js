@@ -28,7 +28,19 @@ describe('GovernorAlpha', () => {
   console.log('GovernorAlpha address: ', governorAlpha.address);
   });
 
-  it('compiles properly', () => {
-    console.log('this has compiled')
+  it('compiles properly', async () => {
+    let tx = await governorAlpha.propose({
+      title: "This is the title",
+      typeOfAction: "This is typeOfAction",
+      neighborhood: "This is neighborhood",
+      personInCharge: "This is personInCharge",
+      description: "This is the description",
+      expiration: ethers.BigNumber.from('50'),
+      budget: ethers.BigNumber.from('100'),
+      requiredTaroToVote: ethers.BigNumber.from('200')
+    });
+    await tx.wait(1);
+
+
   });
 });
