@@ -106,7 +106,7 @@ contract GovernorAlpha {
     // bytes32 public constant BALLOT_TYPEHASH = keccak256("Ballot(uint256 proposalId,bool support)");
 
     /// @notice An event emitted when a new proposal is created
-    event ProposalCreated(uint id, address proposer, address[] targets, uint[] values, string[] signatures, bytes[] calldatas, uint startBlock, uint endBlock, string description);
+    event ProposalCreated(uint indexed id, address proposer, string title);
 
     /// @notice An event emitted when a vote has been cast on a proposal
     // event VoteCast(address voter, uint proposalId, bool support, uint votes);
@@ -158,14 +158,15 @@ contract GovernorAlpha {
             executed: false
         });
 
-        console.log('title: ', newProposal.userInputFields.title);
-        console.log('budget: ', newProposal.userInputFields.budget);
+        // console.log('title: ', newProposal.userInputFields.title);
+        // console.log('budget: ', newProposal.userInputFields.budget);
 
-        // proposals[newProposal.id] = newProposal;
+        proposals[newProposal.id] = newProposal;
         // latestProposalIds[newProposal.proposer] = newProposal.id;
         //
         // emit ProposalCreated(newProposal.id, msg.sender, targets, values, signatures, calldatas, startBlock, endBlock, description);
-        // return newProposal.id;
+        emit ProposalCreated(newProposal.id, newProposal.proposer, newProposal.userInputFields.title);
+        return newProposal.id;
     }
 
     // function queue(uint proposalId) public {

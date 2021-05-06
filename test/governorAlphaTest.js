@@ -28,8 +28,8 @@ describe('GovernorAlpha', () => {
   console.log('GovernorAlpha address: ', governorAlpha.address);
   });
 
-  it('compiles properly', async () => {
-    let tx = await governorAlpha.propose({
+  it('Calls propose()', async () => {
+    let proposalObj = {
       title: "This is the title",
       typeOfAction: "This is typeOfAction",
       neighborhood: "This is neighborhood",
@@ -38,9 +38,15 @@ describe('GovernorAlpha', () => {
       expiration: ethers.BigNumber.from('50'),
       budget: ethers.BigNumber.from('100'),
       requiredTaroToVote: ethers.BigNumber.from('200')
-    });
-    await tx.wait(1);
+    };
 
+    let tx = await governorAlpha.connect(deployer).propose(proposalObj);
+    let tx1 = await tx.wait(1);
+    // console.log(tx1);
+    // console.log(tx1.events[0].args[2].toString())
 
+    expect(tx1.events[0].args[2].toString()).to.equal(proposalObj.title);
   });
+
+
 });
