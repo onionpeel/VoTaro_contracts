@@ -145,7 +145,6 @@ contract GovernorAlpha {
 
         uint startBlock = add256(block.number, votingDelay());
         uint endBlock = add256(startBlock, votingPeriod());
-
         proposalCount++;
         Proposal memory newProposal = Proposal({
             id: proposalCount,
@@ -160,8 +159,6 @@ contract GovernorAlpha {
             executed: false
         });
 
-        // console.log('title: ', newProposal.userInputFields.title);
-        // console.log('budget: ', newProposal.userInputFields.budget);
 
         proposals[newProposal.id] = newProposal;
 
@@ -259,6 +256,8 @@ contract GovernorAlpha {
     // }
 //
     function _castVote(address voter, uint proposalId, bool support) internal {
+        uint96 voterVoteCount = taro.getCurrentVotes(voter);
+
         require(isProposalActive[proposalId] == true, "GovernorAlpha::_castVote: voting is closed");
         Proposal storage proposal = proposals[proposalId];
         Receipt storage receipt = proposal.receipts[voter];
@@ -328,4 +327,5 @@ interface TimelockInterface {
 //
 interface TaroInterface {
     function getPriorVotes(address account, uint blockNumber) external view returns (uint96);
+    function getCurrentVotes(address account) external view returns (uint96);
 }
