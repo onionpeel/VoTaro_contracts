@@ -8,10 +8,10 @@ contract GovernorAlpha {
     string public constant name = "VoTaro Governor Alpha";
 
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
-    // function quorumVotes() public pure returns (uint) { return 400000e18; } // 400,000 = 4% of Comp
+    // function quorumVotes() public pure returns (uint) { return 400000e18; } // 400,000 = 4% of Taro
     //
     /// @notice The number of votes required in order for a voter to become a proposer
-    function proposalThreshold() public pure returns (uint) { return 100000e18; } // 100,000 = 1% of Comp
+    function proposalThreshold() public pure returns (uint) { return 100000e18; } // 100,000 = 1% of Taro
     //
     /// @notice The maximum number of actions that can be included in a proposal
     // function proposalMaxOperations() public pure returns (uint) { return 10; } // 10 actions
@@ -22,11 +22,11 @@ contract GovernorAlpha {
     // /// @notice The duration of voting on a proposal, in blocks
     function votingPeriod() public pure returns (uint) { return 17280; } // ~3 days in blocks (assuming 15s blocks)
     //
-    // /// @notice The address of the Compound Protocol Timelock
+    // /// @notice The address of the Taro Protocol Timelock
     TimelockInterface public timelock;
     //
-    // /// @notice The address of the Compound governance token
-    CompInterface public comp;
+    // /// @notice The address of the Taro governance token
+    TaroInterface public taro;
     //
     // /// @notice The address of the Governor Guardian
     address public guardian;
@@ -43,9 +43,6 @@ contract GovernorAlpha {
 
         // / @notice The timestamp that the proposal will be available for execution, set once the vote succeeds
         uint eta;
-
-        /// @notice A struct that holds the proposal fields from the user input
-        UserInputFields userInputFields;
 
         /// @notice The block at which voting begins: holders must delegate their votes prior to this block
         uint startBlock;
@@ -65,21 +62,24 @@ contract GovernorAlpha {
         /// @notice Flag marking whether the proposal has been executed
         bool executed;
 
+        /// @notice A struct that holds the proposal fields from the user input
+        UserInputFields userInputFields;
+
         /// @notice Receipts of ballots for the entire set of voters
-        // mapping (address => Receipt) receipts;
+        mapping (address => Receipt) receipts;
     }
 
     /// @notice Ballot receipt record for a voter
-    // struct Receipt {
-    //     /// @notice Whether or not a vote has been cast
-    //     bool hasVoted;
-    //
-    //     /// @notice Whether or not the voter supports the proposal
-    //     bool support;
-    //
-    //     /// @notice The number of votes the voter had, which were cast
-    //     uint96 votes;
-    // }
+    struct Receipt {
+        /// @notice Whether or not a vote has been cast
+        bool hasVoted;
+
+        /// @notice Whether or not the voter supports the proposal
+        bool support;
+
+        /// @notice The number of votes the voter had, which were cast
+        uint96 votes;
+    }
 
     /// @notice Possible states that a proposal may be in
     // enum ProposalState {
@@ -99,6 +99,9 @@ contract GovernorAlpha {
     /// @notice The latest proposal for each proposer
     mapping (address => uint) public latestProposalIds;
 
+    /// @notice A mapping of whether or not a proposal is currently active
+    mapping (uint => bool) public isProposalActive;
+
     /// @notice The EIP-712 typehash for the contract's domain
     // bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
@@ -106,10 +109,10 @@ contract GovernorAlpha {
     // bytes32 public constant BALLOT_TYPEHASH = keccak256("Ballot(uint256 proposalId,bool support)");
 
     /// @notice An event emitted when a new proposal is created
-    event ProposalCreated(uint id, address proposer, address[] targets, uint[] values, string[] signatures, bytes[] calldatas, uint startBlock, uint endBlock, string description);
+    event ProposalCreated(uint id);
 
     /// @notice An event emitted when a vote has been cast on a proposal
-    // event VoteCast(address voter, uint proposalId, bool support, uint votes);
+    event VoteCast(address voter, uint proposalId, bool support, uint votes);
 
     /// @notice An event emitted when a proposal has been canceled
     // event ProposalCanceled(uint id);
@@ -120,9 +123,9 @@ contract GovernorAlpha {
     /// @notice An event emitted when a proposal has been executed in the Timelock
     // event ProposalExecuted(uint id);
 
-    constructor(address timelock_, address comp_, address guardian_) public {
+    constructor(address timelock_, address taro_, address guardian_) public {
         timelock = TimelockInterface(timelock_);
-        comp = CompInterface(comp_);
+        taro = TaroInterface(taro_);
         guardian = guardian_;
     }
 
@@ -137,13 +140,11 @@ contract GovernorAlpha {
       uint requiredTaroToVote;
     }
 
-
     function propose(UserInputFields memory _userInputFields) public returns (uint) {
-        // require(comp.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold(), "GovernorAlpha::propose: proposer votes below proposal threshold");
+        // require(taro.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold(), "GovernorAlpha::propose: proposer votes below proposal threshold");
 
         uint startBlock = add256(block.number, votingDelay());
         uint endBlock = add256(startBlock, votingPeriod());
-
         proposalCount++;
         Proposal memory newProposal = Proposal({
             id: proposalCount,
@@ -158,14 +159,15 @@ contract GovernorAlpha {
             executed: false
         });
 
-        console.log('title: ', newProposal.userInputFields.title);
-        console.log('budget: ', newProposal.userInputFields.budget);
 
-        // proposals[newProposal.id] = newProposal;
+        proposals[newProposal.id] = newProposal;
+
+        isProposalActive[newProposal.id] = true;
         // latestProposalIds[newProposal.proposer] = newProposal.id;
         //
-        // emit ProposalCreated(newProposal.id, msg.sender, targets, values, signatures, calldatas, startBlock, endBlock, description);
-        // return newProposal.id;
+
+        emit ProposalCreated(newProposal.id);
+        return newProposal.id;
     }
 
     // function queue(uint proposalId) public {
@@ -199,7 +201,7 @@ contract GovernorAlpha {
     //     require(state != ProposalState.Executed, "GovernorAlpha::cancel: cannot cancel executed proposal");
     //
     //     Proposal storage proposal = proposals[proposalId];
-    //     require(msg.sender == guardian || comp.getPriorVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold(), "GovernorAlpha::cancel: proposer above threshold");
+    //     require(msg.sender == guardian || taro.getPriorVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold(), "GovernorAlpha::cancel: proposer above threshold");
     //
     //     proposal.canceled = true;
     //     for (uint i = 0; i < proposal.targets.length; i++) {
@@ -214,9 +216,9 @@ contract GovernorAlpha {
 //         return (p.targets, p.values, p.signatures, p.calldatas);
 //     }
 //
-//     function getReceipt(uint proposalId, address voter) public view returns (Receipt memory) {
-//         return proposals[proposalId].receipts[voter];
-//     }
+    function getReceipt(uint proposalId, address voter) public view returns (Receipt memory) {
+        return proposals[proposalId].receipts[voter];
+    }
 //
 //     function state(uint proposalId) public view returns (ProposalState) {
 //         require(proposalCount >= proposalId && proposalId > 0, "GovernorAlpha::state: invalid proposal id");
@@ -240,38 +242,40 @@ contract GovernorAlpha {
 //         }
 //     }
 //
-//     function castVote(uint proposalId, bool support) public {
-//         return _castVote(msg.sender, proposalId, support);
-//     }
+    function castVote(uint proposalId, bool support) public {
+        return _castVote(msg.sender, proposalId, support);
+    }
 //
-//     function castVoteBySig(uint proposalId, bool support, uint8 v, bytes32 r, bytes32 s) public {
-//         bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), getChainId(), address(this)));
-//         bytes32 structHash = keccak256(abi.encode(BALLOT_TYPEHASH, proposalId, support));
-//         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
-//         address signatory = ecrecover(digest, v, r, s);
-//         require(signatory != address(0), "GovernorAlpha::castVoteBySig: invalid signature");
-//         return _castVote(signatory, proposalId, support);
-//     }
+    // function castVoteBySig(uint proposalId, bool support, uint8 v, bytes32 r, bytes32 s) public {
+    //     bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), getChainId(), address(this)));
+    //     bytes32 structHash = keccak256(abi.encode(BALLOT_TYPEHASH, proposalId, support));
+    //     bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+    //     address signatory = ecrecover(digest, v, r, s);
+    //     require(signatory != address(0), "GovernorAlpha::castVoteBySig: invalid signature");
+    //     return _castVote(signatory, proposalId, support);
+    // }
 //
-//     function _castVote(address voter, uint proposalId, bool support) internal {
-//         require(state(proposalId) == ProposalState.Active, "GovernorAlpha::_castVote: voting is closed");
-//         Proposal storage proposal = proposals[proposalId];
-//         Receipt storage receipt = proposal.receipts[voter];
-//         require(receipt.hasVoted == false, "GovernorAlpha::_castVote: voter already voted");
-//         uint96 votes = comp.getPriorVotes(voter, proposal.startBlock);
-//
-//         if (support) {
-//             proposal.forVotes = add256(proposal.forVotes, votes);
-//         } else {
-//             proposal.againstVotes = add256(proposal.againstVotes, votes);
-//         }
-//
-//         receipt.hasVoted = true;
-//         receipt.support = support;
-//         receipt.votes = votes;
-//
-//         emit VoteCast(voter, proposalId, support, votes);
-//     }
+    function _castVote(address voter, uint proposalId, bool support) internal {
+        uint96 voterVoteCount = taro.getCurrentVotes(voter);
+
+        require(isProposalActive[proposalId] == true, "GovernorAlpha::_castVote: voting is closed");
+        Proposal storage proposal = proposals[proposalId];
+        Receipt storage receipt = proposal.receipts[voter];
+        require(receipt.hasVoted == false, "GovernorAlpha::_castVote: voter already voted");
+        uint96 votes = taro.getPriorVotes(voter, proposal.startBlock);
+
+        if (support) {
+            proposal.forVotes = add256(proposal.forVotes, votes);
+        } else {
+            proposal.againstVotes = add256(proposal.againstVotes, votes);
+        }
+
+        receipt.hasVoted = true;
+        receipt.support = support;
+        receipt.votes = votes;
+
+        emit VoteCast(voter, proposalId, support, votes);
+    }
 //
 //     function __acceptAdmin() public {
 //         require(msg.sender == guardian, "GovernorAlpha::__acceptAdmin: sender must be gov guardian");
@@ -321,6 +325,7 @@ interface TimelockInterface {
     function executeTransaction(address target, uint value, string calldata signature, bytes calldata data, uint eta) external payable returns (bytes memory);
 }
 //
-interface CompInterface {
+interface TaroInterface {
     function getPriorVotes(address account, uint blockNumber) external view returns (uint96);
+    function getCurrentVotes(address account) external view returns (uint96);
 }

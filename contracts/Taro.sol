@@ -1,6 +1,8 @@
 pragma solidity ^0.5.16;
 pragma experimental ABIEncoderV2;
 
+import "hardhat/console.sol";
+
 contract Taro {
     /// @notice EIP-20 token name for this token
     string public constant name = "Taro";
@@ -268,7 +270,6 @@ contract Taro {
           checkpoints[delegatee][nCheckpoints] = Checkpoint(blockNumber, newVotes);
           numCheckpoints[delegatee] = nCheckpoints + 1;
       }
-
       emit DelegateVotesChanged(delegatee, oldVotes, newVotes);
     }
 
