@@ -108,7 +108,7 @@ contract GovernorAlpha {
     mapping (uint => bool) public isProposalActive;
 
     /// @notice Collection of all Validation structs that are used to calculate the validity of an address
-    mapping (address => Validation) validations;
+    mapping (address => Validation) public validations;
 
     /// @notice The EIP-712 typehash for the contract's domain
     // bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
@@ -231,7 +231,7 @@ contract GovernorAlpha {
     function validate(uint _rewardedTokens) public returns(uint) {
       if(validations[msg.sender].expirationTime == 0) {
         validations[msg.sender] = Validation({
-            expirationTime: block.timestamp + 3
+            expirationTime: block.timestamp + 2
         });
         bool transferred = taro.transferFrom(address(this), msg.sender, _rewardedTokens);
         require(transferred, "Tokens not transferred to msg.sender");
@@ -256,6 +256,14 @@ contract GovernorAlpha {
       }
       require(isValid, 'user is not currently validated');
       _;
+    }
+
+    function getValidityStatus() public view returns(uint) {
+      if(validations[msg.sender].expirationTime > block.timestamp) {
+          return 1;
+      } else {
+          return 0;
+      }
     }
 
     function getReceipt(uint proposalId, address voter) public view returns (Receipt memory) {

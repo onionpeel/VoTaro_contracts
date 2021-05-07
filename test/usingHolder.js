@@ -38,17 +38,17 @@ describe('GovernorAlpha', () => {
 
   xit('New user receives tokens for validating', async () => {
     let user1Validate = await governorAlpha.connect(user1).validate(ethers.BigNumber.from('100'));
-    let user1ValidateReceipt = await user1Validate.wait();
+    let user1ValidateReceipt = await user1Validate.wait(1);
 
     let user1NewBalance = await taro.balanceOf(user1.address);
     console.log('user1NewBalance: ', user1NewBalance.toString());
   });
 
-  it('Only a valid user can make a proposal', async () => {
+  xit('Only a valid user can make a proposal', async () => {
     let user1Validate = await governorAlpha.connect(user1).validate(ethers.BigNumber.from('100'));
     await user1Validate.wait(1);
 
-    //This delay function is used to test the modifier checkValidity().  When using this, set the expiration time to block.timestamp + 3 so that the attempt to call propose() is made after the validation has expired. 
+    //This delay function is used to test the modifier checkValidity().  When using this, set the expiration time to block.timestamp + 3 so that the attempt to call propose() is made after the validation has expired.
     // const delay = () => new Promise(res => setTimeout(res, 5000));
     // await delay();
 
@@ -66,6 +66,24 @@ describe('GovernorAlpha', () => {
     let tx = await governorAlpha.connect(user1).propose(proposalObj);
     let txReceipt = await tx.wait(1);
     console.log(txReceipt);
+  });
+
+  it('Returns a user validation status', async () => {
+    //THIS TEST DOES NOT WORK PROPERLY!!!!!!!!!!!!!!!!!!!!
+
+    let user1Validate = await governorAlpha.connect(user1).validate(ethers.BigNumber.from('100'));
+    let tx2 = await user1Validate.wait(1);
+    // console.log('tx2: ', tx2)
+
+    //This delay function is used to test the modifier checkValidity().  When using this, set the expiration time to block.timestamp + 3 so that the attempt to call propose() is made after the validation has expired.
+    const delay = () => new Promise(res => setTimeout(res, 5000));
+    await delay();
+
+
+    let user1Status = await governorAlpha.connect(user1).getValidityStatus();
+    await user1Status.wait(1);
+
+    console.log(user1Status[0].toString(), user1Status[1].toString());
   });
 
 });
