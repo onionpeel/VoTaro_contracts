@@ -81,6 +81,11 @@ contract GovernorAlpha {
         uint96 votes;
     }
 
+    /// @notice Stores the time for calculating validity
+    struct Validation {
+      uint expirationTime;
+    }
+
     /// @notice Possible states that a proposal may be in
     // enum ProposalState {
     //     Pending,
@@ -101,6 +106,9 @@ contract GovernorAlpha {
 
     /// @notice A mapping of whether or not a proposal is currently active
     mapping (uint => bool) public isProposalActive;
+
+    /// @notice Collection of all Validation structs that are used to calculate the validity of an address
+    mapping (address => Validation) validations;
 
     /// @notice The EIP-712 typehash for the contract's domain
     // bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
@@ -123,6 +131,7 @@ contract GovernorAlpha {
     /// @notice An event emitted when a proposal has been executed in the Timelock
     // event ProposalExecuted(uint id);
 
+
     constructor(address timelock_, address taro_, address guardian_) public {
         timelock = TimelockInterface(timelock_);
         taro = TaroInterface(taro_);
@@ -140,7 +149,7 @@ contract GovernorAlpha {
       uint requiredTaroToVote;
     }
 
-    function propose(UserInputFields memory _userInputFields) public returns (uint) {
+    function propose(UserInputFields memory _userInputFields) public checkValidity returns (uint) {
         // require(taro.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold(), "GovernorAlpha::propose: proposer votes below proposal threshold");
 
         uint startBlock = add256(block.number, votingDelay());
@@ -216,6 +225,39 @@ contract GovernorAlpha {
 //         return (p.targets, p.values, p.signatures, p.calldatas);
 //     }
 //
+
+    //The front end will respond based on the uint value that is returned.
+    //The user cannot validate if the user is currently validated.
+    function validate(uint _rewardedTokens) public returns(uint) {
+      if(validations[msg.sender].expirationTime == 0) {
+        validations[msg.sender] = Validation({
+            expirationTime: block.timestamp + 3
+        });
+        bool transferred = taro.transferFrom(address(this), msg.sender, _rewardedTokens);
+        require(transferred, "Tokens not transferred to msg.sender");
+        return 0; //validates new user
+      } else if(validations[msg.sender].expirationTime >= block.timestamp) {
+          return 1; //already validated
+      } else {
+          validations[msg.sender] = Validation({
+              expirationTime: block.timestamp + 10
+          });
+          return 2; // return 2; //renew validation
+      }
+    }
+
+    //Ensure that the user is validated and making the function call prior to the expiration time.
+    modifier checkValidity {
+      bool isValid;
+      if(validations[msg.sender].expirationTime > block.timestamp) {
+          isValid = true;
+      } else {
+          isValid = false;
+      }
+      require(isValid, 'user is not currently validated');
+      _;
+    }
+
     function getReceipt(uint proposalId, address voter) public view returns (Receipt memory) {
         return proposals[proposalId].receipts[voter];
     }
@@ -242,7 +284,7 @@ contract GovernorAlpha {
 //         }
 //     }
 //
-    function castVote(uint proposalId, bool support) public {
+    function castVote(uint proposalId, bool support) public checkValidity {
         return _castVote(msg.sender, proposalId, support);
     }
 //
@@ -256,8 +298,6 @@ contract GovernorAlpha {
     // }
 //
     function _castVote(address voter, uint proposalId, bool support) internal {
-        uint96 voterVoteCount = taro.getCurrentVotes(voter);
-
         require(isProposalActive[proposalId] == true, "GovernorAlpha::_castVote: voting is closed");
         Proposal storage proposal = proposals[proposalId];
         Receipt storage receipt = proposal.receipts[voter];
@@ -328,4 +368,5 @@ interface TimelockInterface {
 interface TaroInterface {
     function getPriorVotes(address account, uint blockNumber) external view returns (uint96);
     function getCurrentVotes(address account) external view returns (uint96);
+    function transferFrom(address src, address dst, uint rawAmount) external returns (bool);
 }
